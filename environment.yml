@@ -1,0 +1,22 @@
+name: ds-rag
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+  - huggingface
+dependencies:
+  - python>=3.9
+  - numpy
+  - pandas
+  - jupyter
+  - pytorch
+  - torchvision
+  - torchtext
+  - pytorch-cuda=11.8
+  - huggingface_hub
+  - transformers
+  - sentencepiece
+  - sentence-transformers
+  - faiss-gpu
+  - langchain
+  - streamlit
