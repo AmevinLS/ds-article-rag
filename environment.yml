@@ -21,3 +21,6 @@ dependencies:
   - faiss-gpu
   - langchain
   - streamlit
+  - pip
+  - pip:
+    - ollama
