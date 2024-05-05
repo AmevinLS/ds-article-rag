@@ -4,7 +4,9 @@ import pandas as pd
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 
 import itertools
+import os
 import argparse
+import csv
 from typing import List, Dict, Callable
 
 
@@ -121,49 +123,68 @@ def calc_embeddings(texts: List[str], model_name: str) -> np.ndarray:
     return embeds
 
 
-def preprocess_complete(
+def preprocess(
     data_dir_path: str, join_std_multiplier: float = 0.5, verbose: bool = True
 ):
+    cache_dir_path = os.path.join(data_dir_path, "cache")
+    if not os.path.exists(cache_dir_path):
+        os.mkdir(cache_dir_path)
+    code_reduced_df_path = os.path.join(cache_dir_path, "code_reduced_paragraphs.csv")
+    code_reduced_embeds_path = os.path.join(
+        cache_dir_path, "code_reduced_par_embeds.npy"
+    )
+
     # Loading and splitting data into paragraphs
     if verbose:
         print("Loading and splitting articles...")
-    data = pd.read_csv(f"{data_dir_path}/medium.csv")
+    data = pd.read_csv(os.path.join(data_dir_path, "medium.csv"))
     paragraphs = data["Text"].str.split("\n\n").explode()
     pars_df = paragraphs.reset_index().rename(columns={"index": "article_idx"})
 
     # Detecting and joining 'code' paragraphs
-    if verbose:
-        print("Detecting and joining code paragraphs...")
-    patterns = {
-        "call": r"^[\w.]+\(",
-        "getitem": r"^[\w.]+\[",
-        "import": r"(^import |^from [\w.]+ import)",
-        "class_def": r"^class \w+:$",
-        "func_def": r"^def \w+\(",
-        "return": r"^(return|yield|raise) ",
-        "exception": r"^(try|catch|finally) .+:",
-        "comment": r"#+ \w+",
-        "loop": r"^(for|while) .+:",
-        "if": r"^(if|else) .+:",
-        "assign": r"^[\w.]+ ?[+\-\/*]?= ?.+",
-        "no_letters": r"^[^A-Za-z]*$",
-    }
-    match_counts = count_pattern_matches(pars_df["Text"], patterns=patterns)
-    code_suspects = pars_df.loc[match_counts.sum(axis=1) > 0]
-    code_groups = group_by_consecutive_blocks(pars_df, code_suspects.index.to_numpy())
-    reduced_pars_df = collapse_df_by_inds(
-        pars_df,
-        code_groups,
-        agg_mapping={"article_idx": lambda idxs: idxs.mode(), "Text": "\n".join},
-    )
+    if os.path.exists(code_reduced_df_path) and os.path.exists(
+        code_reduced_embeds_path
+    ):
+        reduced_pars_df = pd.read_csv(code_reduced_df_path, keep_default_na=False)
+        par_embeds: np.ndarray = np.load(code_reduced_embeds_path)
+        assert reduced_pars_df.shape[0] == par_embeds.shape[0]
+    else:
+        if verbose:
+            print("Detecting and joining code paragraphs...")
+        patterns = {
+            "call": r"^[\w.]+\(",
+            "getitem": r"^[\w.]+\[",
+            "import": r"(^import |^from [\w.]+ import)",
+            "class_def": r"^class \w+:$",
+            "func_def": r"^def \w+\(",
+            "return": r"^(return|yield|raise) ",
+            "exception": r"^(try|catch|finally) .+:",
+            "comment": r"#+ \w+",
+            "loop": r"^(for|while) .+:",
+            "if": r"^(if|else) .+:",
+            "assign": r"^[\w.]+ ?[+\-\/*]?= ?.+",
+            "no_letters": r"^[^A-Za-z]*$",
+        }
+        match_counts = count_pattern_matches(pars_df["Text"], patterns=patterns)
+        code_suspects = pars_df.loc[match_counts.sum(axis=1) > 0]
+        code_groups = group_by_consecutive_blocks(
+            pars_df, code_suspects.index.to_numpy()
+        )
+        reduced_pars_df = collapse_df_by_inds(
+            pars_df,
+            code_groups,
+            agg_mapping={"article_idx": lambda idxs: idxs.mode(), "Text": "\n".join},
+        )
+        reduced_pars_df.to_csv(code_reduced_df_path, quoting=csv.QUOTE_ALL, index=False)
 
-    # Calculating paragraph embeddings and joining consecutive similar ones
-    if verbose:
-        print("Calculating embeddings and joining similar ones...")
-    # TODO: Load saved embeddings if present in directory
-    par_embeds = calc_embeddings(
-        texts=reduced_pars_df["Text"].to_list(), model_name="all-MiniLM-L6-v2"
-    )
+        if verbose:
+            print("Calculating embeddins...")
+        par_embeds = calc_embeddings(
+            texts=reduced_pars_df["Text"].to_list(), model_name="all-MiniLM-L6-v2"
+        )
+        np.save(code_reduced_embeds_path, par_embeds)
+
+    # Joining consecutive similar paragraphs
     groups = group_by_consecutive_sims(
         reduced_pars_df, par_embeds, std_multiplier=join_std_multiplier
     )
@@ -184,13 +205,7 @@ def preprocess_complete(
     )
     grouped_pars = grouped_pars.reset_index(names="paragraph_idx")
 
-    # Persisting results to disk
-    if verbose:
-        print("Saving to disk...")
-    code_suspects.to_csv(f"{data_dir_path}/code_suspects.csv")
-    reduced_pars_df.to_csv(f"{data_dir_path}/code_reduced_paragraphs.csv", index=False)
-    grouped_pars.to_csv(f"{data_dir_path}/final_joined_paragraphs.csv", index=False)
-    np.save(f"{data_dir_path}/code_reduced_par_embeds.npy", par_embeds)
+    return grouped_pars
 
 
 if __name__ == "__main__":
@@ -207,4 +222,10 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args().__dict__
-    preprocess_complete(args["data_dir"], join_std_multiplier=args["join_std_mult"])
+    grouped_pars = preprocess(
+        args["data_dir"], join_std_multiplier=args["join_std_mult"]
+    )
+    grouped_pars.to_csv(
+        os.path.join(args["data_dir"], "final_joined_paragraphs.csv"),
+        quoting=csv.QUOTE_ALL,
+    )
