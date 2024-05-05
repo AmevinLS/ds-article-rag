@@ -1,21 +1,18 @@
 import streamlit as st
 
-from langchain.document_loaders.csv_loader import CSVLoader
 from langchain.docstore.document import Document
-import ollama
-
-from retrieval import faiss_from_docs
 
 from typing import List, Tuple
 from dataclasses import dataclass
 
+from data_prep import preprocess
+from retrieval import faiss_from_csv, faiss_from_df
+from generation import prompt_ollama_with_articles
 
-@st.cache_resource
-def build_faiss(csv_path: str, metadata_columns: List[str]):
-    loader = CSVLoader(csv_path, metadata_columns=metadata_columns, encoding="utf-8")
-    articles = loader.load()
 
-    return faiss_from_docs(article_docs=articles, model_name="all-MiniLM-L6-v2")
+# PARAGRAPHS_PATH = R"D:\Repos\ds-article-rag\data\final_joined_paragraphs.csv"
+DATA_DIR = R"D:\Repos\ds-article-rag\data"
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 
 @dataclass
@@ -23,14 +20,6 @@ class RetrieveResult:
     docs_with_scores: List[Tuple[Document, float]]
     sim_threshold: float
     retrieve_k: int
-
-    def filter_docs_by_score(self) -> List[Tuple[Document, float]]:
-        result = [
-            (doc, score)
-            for doc, score in self.docs_with_scores
-            if score >= self.sim_threshold
-        ]
-        return result
 
 
 class Response:
@@ -42,7 +31,7 @@ class Response:
     ):
         self.segment_entries = []
         self.n_not_shown = 0
-        for i, (doc, score) in enumerate(retr_result.docs_with_scores):
+        for doc, score in retr_result.docs_with_scores:
             if score < retr_result.sim_threshold:
                 self.n_not_shown += 1
             else:
@@ -50,30 +39,15 @@ class Response:
                     {
                         "score": score,
                         "title": doc.metadata["Title"],
-                        "content": doc.page_content[6:],
+                        "content": doc.page_content,
                     }
                 )
         self.llm_response = None
         if query_llm and len(self.segment_entries) > 0:
             with st.spinner("Querying LLM..."):
-                self.llm_response = self._prompt_ollama(query, "llama2")
-
-    def _prompt_ollama(self, query: str, model: str) -> str:
-        prompt_system = "Summarize the information to the user's prompt based only on the retrieved documents below. Do not add any external information.\n\n"
-        for i, entry in enumerate(self.segment_entries):
-            prompt_system += f"{i+1}. {entry['title']}\n\n" f"{entry['content']}\n\n"
-
-        ollama_result = ollama.chat(
-            model=model,
-            messages=[
-                {"role": "system", "content": prompt_system},
-                {
-                    "role": "user",
-                    "content": query,
-                },
-            ],
-        )
-        return ollama_result["message"]["content"]
+                self.llm_response = prompt_ollama_with_articles(
+                    query, model="llama2", articles=self.segment_entries
+                )
 
     def display(self):
         with st.chat_message("assistant"):
@@ -94,13 +68,17 @@ class Response:
                 st.markdown(f"#### LLM RESPONSE:\n" f"{self.llm_response}")
 
 
+faiss_from_df = st.cache_resource(faiss_from_df)
+preprocess = st.cache_resource(preprocess)
+
 if __name__ == "__main__":
     st.title("Towards Data Science Articles Retrieval")
 
     ## Sidebar
     st.sidebar.header("Controls")
+    st.sidebar.markdown("## **Retrieval Parameters**")
     retrieve_k = st.sidebar.slider(
-        "Set number of article segments to retrieve",
+        "*Set number of article segments to retrieve*",
         value=4,
         min_value=1,
         max_value=10,
@@ -108,12 +86,28 @@ if __name__ == "__main__":
         key="retrieve_k",
     )
     sim_threshold = st.sidebar.slider(
-        "Set minimum cosine similarity threshold",
+        "*Set minimum cosine similarity score threshold*",
         value=0.5,
         min_value=-1.0,
         max_value=1.0,
         key="sim_threshold",
     )
+
+    st.sidebar.markdown("## **Preprocessing Parameters**")
+    join_std_multiplier = st.sidebar.slider(
+        "*Paragraph joining STD multiplier*",
+        value=0.5,
+        min_value=-3.0,
+        max_value=3.0,
+        step=0.1,
+        key="join_std_multiplier",
+        help="Higher value -> less paragraphs are joined",
+    )
+    rerun_preprocessing = st.sidebar.button("Rerun Preprocessing", type="primary")
+    if ("join_std_mult" not in st.session_state) or rerun_preprocessing:
+        st.session_state.join_std_mult = join_std_multiplier
+
+    st.sidebar.markdown("-----")
     query_llm = st.sidebar.toggle(
         "Query LLM on retrieval results\n", help="Will lead to long response times!"
     )
@@ -126,10 +120,16 @@ if __name__ == "__main__":
     messages: list = st.session_state.messages
 
     # TODO: perhaps build and persist faiss beforehand - and only load here
-    faiss_db = build_faiss(
-        R"D:\Repos\ds-article-rag\data\grouped_paragraphs.csv",
-        metadata_columns=["paragraph_idx", "article_idx", "Title"],
-    )
+    with st.spinner("Preprocessing data..."):
+        joined_pars_df = preprocess(
+            DATA_DIR,
+            join_std_multiplier=st.session_state.join_std_mult,
+            verbose=False,
+        )
+    with st.spinner("Building FAISS index..."):
+        faiss_db = faiss_from_df(
+            joined_pars_df, page_content_column="Text", model_name="all-MiniLM-L6-v2"
+        )
 
     ## Show previous messages
     for message in messages:
