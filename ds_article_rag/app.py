@@ -1,21 +1,15 @@
 import streamlit as st
 
-from langchain.document_loaders.csv_loader import CSVLoader
 from langchain.docstore.document import Document
-import ollama
-
-from retrieval import faiss_from_docs
 
 from typing import List, Tuple
 from dataclasses import dataclass
 
+from retrieval import faiss_from_csv
+from generation import prompt_ollama_with_articles
 
-@st.cache_resource
-def build_faiss(csv_path: str, metadata_columns: List[str]):
-    loader = CSVLoader(csv_path, metadata_columns=metadata_columns, encoding="utf-8")
-    articles = loader.load()
 
-    return faiss_from_docs(article_docs=articles, model_name="all-MiniLM-L6-v2")
+PARAGRAPHS_PATH = R"D:\Repos\ds-article-rag\data\final_joined_paragraphs.csv"
 
 
 @dataclass
@@ -23,14 +17,6 @@ class RetrieveResult:
     docs_with_scores: List[Tuple[Document, float]]
     sim_threshold: float
     retrieve_k: int
-
-    def filter_docs_by_score(self) -> List[Tuple[Document, float]]:
-        result = [
-            (doc, score)
-            for doc, score in self.docs_with_scores
-            if score >= self.sim_threshold
-        ]
-        return result
 
 
 class Response:
@@ -42,7 +28,7 @@ class Response:
     ):
         self.segment_entries = []
         self.n_not_shown = 0
-        for i, (doc, score) in enumerate(retr_result.docs_with_scores):
+        for doc, score in retr_result.docs_with_scores:
             if score < retr_result.sim_threshold:
                 self.n_not_shown += 1
             else:
@@ -56,24 +42,9 @@ class Response:
         self.llm_response = None
         if query_llm and len(self.segment_entries) > 0:
             with st.spinner("Querying LLM..."):
-                self.llm_response = self._prompt_ollama(query, "llama2")
-
-    def _prompt_ollama(self, query: str, model: str) -> str:
-        prompt_system = "Summarize the information to the user's prompt based only on the retrieved documents below. Do not add any external information.\n\n"
-        for i, entry in enumerate(self.segment_entries):
-            prompt_system += f"{i+1}. {entry['title']}\n\n" f"{entry['content']}\n\n"
-
-        ollama_result = ollama.chat(
-            model=model,
-            messages=[
-                {"role": "system", "content": prompt_system},
-                {
-                    "role": "user",
-                    "content": query,
-                },
-            ],
-        )
-        return ollama_result["message"]["content"]
+                self.llm_response = prompt_ollama_with_articles(
+                    query, model="llama2", articles=self.segment_entries
+                )
 
     def display(self):
         with st.chat_message("assistant"):
@@ -92,6 +63,9 @@ class Response:
                 )
             if self.llm_response is not None:
                 st.markdown(f"#### LLM RESPONSE:\n" f"{self.llm_response}")
+
+
+faiss_from_csv = st.cache_resource(faiss_from_csv)
 
 
 if __name__ == "__main__":
@@ -126,8 +100,8 @@ if __name__ == "__main__":
     messages: list = st.session_state.messages
 
     # TODO: perhaps build and persist faiss beforehand - and only load here
-    faiss_db = build_faiss(
-        R"D:\Repos\ds-article-rag\data\grouped_paragraphs.csv",
+    faiss_db = faiss_from_csv(
+        PARAGRAPHS_PATH,
         metadata_columns=["paragraph_idx", "article_idx", "Title"],
     )
 
