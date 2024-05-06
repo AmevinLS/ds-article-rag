@@ -6,6 +6,9 @@
 
 
 ## How to run
+**Note**: Startup of the app as well as LLM querying can take a long time, *especially* without a GPU. \
+If you don't have llama2 downloaded in ollama (or your running with docker), first invocation of LLM querying can be very time-consuming due to ollama downloading the llama2 model (it is known to have connection issues).
+
 ### Running with Docker
 1. Run `git clone https://github.com/AmevinLS/ds-article-rag`
 2. Change working directory to the cloned repository (`cd ds-article-rag`)
@@ -37,3 +40,6 @@ data/
 
 ## Demo
 ![](./docs/demonstration.gif)
+
+## Details on the system
+You can find the details pertaining to how the whole system is structured and other relevant information in the `./docs/report.md` file in this repository
