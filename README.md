@@ -13,7 +13,9 @@ If you don't have llama2 downloaded in ollama (or your running with docker), fir
 1. Run `git clone https://github.com/AmevinLS/ds-article-rag`
 2. Change working directory to the cloned repository (`cd ds-article-rag`)
 3. Download [dataset](https://www.kaggle.com/datasets/meruvulikith/1300-towards-datascience-medium-articles-dataset) and extract it to `./data/medium.csv` (create the `./data` directory if needed)
-4. Run `docker-compose up`
+4. Run:
+    - `docker-compose -f docker-compose_cpu.yml up --build` to run on CPU, if you don't have an Nvidia GPU
+    - `docker-compose -f docker-compose_gpu.yml up --build` to run using your Nvidia GPU
 5. Go to `http://localhost:8501` in your browser to open the streamlit app
 
 ### Running locally
