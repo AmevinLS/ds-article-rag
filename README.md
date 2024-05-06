@@ -34,3 +34,6 @@ data/
     code_reduced_par_embeds.npy
     code_reduced_paragraphs.csv
 ```
+
+## Demo
+![](./docs/demonstration.gif)
