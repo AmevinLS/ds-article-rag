@@ -1,0 +1,15 @@
+numpy==1.26.4
+pandas==2.2.2
+matplotlib==3.8.4
+jupyter==1.0.0
+torch==2.3.0
+torchtext==0.18.0
+torchvision==0.18.0
+huggingface_hub==0.22.2
+transformers==4.40.0
+sentencepiece==0.2.0
+sentence-transformers==2.7.0
+faiss-cpu
+langchain==0.1.16
+streamlit==1.33.0
+ollama==0.1.9

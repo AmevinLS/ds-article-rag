@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  ollama_service:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  streamlit_app:
+    build: 
+      context: .
+      dockerfile: Dockerfile.streamlit_app
+    volumes:
+      - "./data:/app/data"
+    ports:
+      - "8501:8501"
+    depends_on:
+      - ollama_service
+    environment:
+      DATA_DIR: /app/data
+      EMBEDDING_MODEL: all-MiniLM-L6-v2
+      OLLAMA_HOST: http://ollama_service:11434
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

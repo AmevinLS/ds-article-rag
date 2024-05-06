@@ -68,6 +68,19 @@ def count_pattern_matches(texts: pd.Series, patterns: Dict[str, str]) -> pd.Data
 def group_by_consecutive_blocks(
     df: pd.DataFrame, indices: np.ndarray
 ) -> List[List[int]]:
+    """Groups DataFrame rows with indices into consecutive blocks.
+
+    This function assumes the DataFrame has a column named "article_idx". It identifies rows with indices in 'indices'
+    and groups them into consecutive blocks based on their article indices.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the rows to be grouped.
+        indices (np.ndarray): A NumPy array of indices of rows to be considered for grouping.
+
+    Returns:
+        List[List[int]]: A list of lists, where each inner list represents a group of consecutive row indices
+        belonging to the same article.
+    """
     assert "article_idx" in df.columns
 
     is_in_indices_mask = np.zeros(len(df), dtype=np.bool_)
@@ -89,6 +102,15 @@ def group_by_consecutive_blocks(
 
 
 def get_cos_sims(embeds: np.ndarray) -> np.ndarray:
+    """Calculates cosine similarities between consecutive embeddings in a NumPy array.
+
+    Args:
+        embeds (np.ndarray): A NumPy array of word embeddings.
+
+    Returns:
+        np.ndarray: A NumPy array of cosine similarities between consecutive embeddings in 'embeds'.
+    """
+
     norms = np.linalg.norm(embeds, axis=1)
     return (embeds[1:] * embeds[:-1]).sum(axis=1) / norms[1:] / norms[:-1]
 
@@ -96,6 +118,23 @@ def get_cos_sims(embeds: np.ndarray) -> np.ndarray:
 def group_by_consecutive_sims(
     df: pd.DataFrame, embeds: np.ndarray, std_multiplier=0.5
 ) -> List[List[int]]:
+    """Groups DataFrame rows with indices into consecutive blocks based on cosine similarity of embeddings.
+
+    This function assumes the DataFrame has a column named "article_idx". It calculates cosine similarities between
+    consecutive word embeddings in 'embeds' and uses them to group rows in 'df' with similar embeddings into
+    consecutive blocks based on their article indices.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the rows to be grouped.
+        embeds (np.ndarray): A NumPy array of word embeddings corresponding to rows in 'df'.
+        std_multiplier (float, optional): A multiplier to adjust the threshold for grouping based on standard
+            deviation of cosine similarities. Defaults to 0.5.
+
+    Returns:
+        List[List[int]]: A list of lists, where each inner list represents a group of consecutive row indices
+        belonging to the same article.
+    """
+
     assert "article_idx" in df.columns
 
     embed_sims = get_cos_sims(embeds)
@@ -118,6 +157,16 @@ def group_by_consecutive_sims(
 
 
 def calc_embeddings(texts: List[str], model_name: str) -> np.ndarray:
+    """Calculates word embeddings for a list of strings using a sentence_transformers model.
+
+    Args:
+        texts (List[str]): A list of strings for which word embeddings need to be calculated.
+        model_name (str): The name of the sentence_transformers model to be used for embedding calculation.
+
+    Returns:
+        np.ndarray: A NumPy array of word embeddings, where each row represents the embedding of a corresponding text in 'texts'.
+    """
+
     hf_embeddings = HuggingFaceEmbeddings(model_name=model_name)
     embeds = np.array(hf_embeddings.embed_documents(texts))
     return embeds
@@ -126,6 +175,29 @@ def calc_embeddings(texts: List[str], model_name: str) -> np.ndarray:
 def preprocess(
     data_dir_path: str, join_std_multiplier: float = 0.5, verbose: bool = True
 ):
+    """Preprocesses directory containing 'medium.csv' dataset file and generates a DataFrame of joined paragraphs.
+
+    This function performs the following steps:
+
+    1. Loads and splits articles into paragraphs from 'medium.csv'.
+    2. Detects and joins 'code' paragraphs based on regular expression patterns.
+    3. Calculates word embeddings for the paragraphs or load them if cache is present.
+    4. Groups consecutive paragraphs with similar embeddings into blocks.
+    5. Joins the text content of paragraphs within each block.
+    6. Merges article titles from 'medium.csv' and adds a 'paragraph_idx' column for indexing.
+
+    Args:
+        data_dir_path (str): The path to the directory containing 'medium.csv' file.
+        join_std_multiplier (float, optional): A multiplier to adjust the threshold for grouping paragraphs
+            based on standard deviation of cosine similarities. Defaults to 0.5.
+        verbose (bool, optional): A flag to control whether to print progress messages. Defaults to True.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing preprocessed data with columns 'article_idx', 'Text', and 'Title'.
+            'article_idx' groups paragraphs belonging to the same article, 'Text' contains the joined text content
+            of paragraphs within a block, and 'Title' is the title of the corresponding article.
+    """
+
     cache_dir_path = os.path.join(data_dir_path, "cache")
     if not os.path.exists(cache_dir_path):
         os.mkdir(cache_dir_path)

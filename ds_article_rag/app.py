@@ -2,6 +2,7 @@ import streamlit as st
 
 from langchain.docstore.document import Document
 
+import os
 from typing import List, Tuple
 from dataclasses import dataclass
 
@@ -11,8 +12,9 @@ from generation import prompt_ollama_with_articles
 
 
 # PARAGRAPHS_PATH = R"D:\Repos\ds-article-rag\data\final_joined_paragraphs.csv"
-DATA_DIR = R"D:\Repos\ds-article-rag\data"
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+DATA_DIR = os.environ["DATA_DIR"]
+EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
+OLLAMA_HOST = os.environ["OLLAMA_HOST"]
 
 
 @dataclass
@@ -46,7 +48,10 @@ class Response:
         if query_llm and len(self.segment_entries) > 0:
             with st.spinner("Querying LLM..."):
                 self.llm_response = prompt_ollama_with_articles(
-                    query, model="llama2", articles=self.segment_entries
+                    query,
+                    model="llama2",
+                    articles=self.segment_entries,
+                    ollama_host=OLLAMA_HOST,
                 )
 
     def display(self):
@@ -96,7 +101,7 @@ if __name__ == "__main__":
     st.sidebar.markdown("## **Preprocessing Parameters**")
     join_std_multiplier = st.sidebar.slider(
         "*Paragraph joining STD multiplier*",
-        value=0.5,
+        value=0.1,
         min_value=-3.0,
         max_value=3.0,
         step=0.1,
