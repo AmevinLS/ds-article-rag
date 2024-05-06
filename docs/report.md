@@ -13,12 +13,13 @@
 
 The task lies in retrieving relevant articles excerpts from the **1300+ Towards DataScience Medium Articles Dataset** dataset ([link](https://www.kaggle.com/datasets/meruvulikith/1300-towards-datascience-medium-articles-dataset)).
 
-Because pure article retrieval 
+Because pure article segment retrieval is quite a strange task for this dataset. This is due TDS articles necessarily being text written with a single idea thread from start to finish. This is why the "generation" part of RAG comes into play - LLM summarization of the retrieved documents can distill the core information. This is why this LLM summarization was added as an optional feature.
 
 
-## 2. System design
+# 2. System design
 
 ### Overview
+[TODO]
 
 ### Chunking strategy
 1. Each article is divided into paragraphs (split by `"\n\n"`).
@@ -26,7 +27,7 @@ Because pure article retrieval
 3. Perform "semantic chunking" on the paragraphs:
     - Calculate embeddings for each paragraph using `EMBEDDING_MODEL`
     - Compute embedding similarity between each pair of consecutive paragraphs; compute $\mu$ and $\sigma$ of all these similarities
-    - For each pair of consecutive paragraphs $A$ and $B$, collapse them together if $[sim(A,B) > \mu + \sigma * \text{std\_multiplier}]$
+    - For each pair of consecutive paragraphs $A$ and $B$, collapse them together if $[sim(A,B) > \mu + \sigma * \text{stdMultiplier}]$
 
 `EMBEDDING_MODEL="all-MiniLM-L6-v2"` was used for embeddings throughout the whole system - for chunking and for index creation
 
@@ -69,6 +70,10 @@ Because the user might enter a poor prompt (e.g. non-specific query "sklearn"), 
 
 
 ## 5. Areas for future improvements
+- **Paragraph lookaround at query time**. Apart from chunking the paragraphs before indexing, we can also prepend/append neighboring paragraphs to the one retrieved from the FAISS index. The process could look like as follows:
+    - Retrieve paragraph (with index `best_idx`) with highest similarity score to query
+    - Calculate similarities of the query to paragraphs in the range `[best_idx-k : best_idx+k]`
+    - Choose range of paragraphs with largest average (or any kind of weighted average) similarity to query
 - **Query reformulation**. Preprocess the user's query using an LLM to reformulate the query in a way that adds more context to achieve better retrieval results (e.g. "XGBoost" query might be too small and lacking specific information)
 - **Limit length of context passed to LLM**. Introduce this safeguard to avoid errors or limit processing time. This can be done by truncating the whole LLM input, or truncating each retrieved result, or extracting most important subparagraph section.
 - **Cache FAISS index to disk**
