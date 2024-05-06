@@ -7,7 +7,7 @@ from typing import List, Tuple
 from dataclasses import dataclass
 
 from data_prep import preprocess
-from retrieval import faiss_from_csv, faiss_from_df
+from retrieval import faiss_from_df
 from generation import prompt_ollama_with_articles
 
 
