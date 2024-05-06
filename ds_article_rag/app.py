@@ -11,10 +11,9 @@ from retrieval import faiss_from_df
 from generation import prompt_ollama_with_articles
 
 
-# PARAGRAPHS_PATH = R"D:\Repos\ds-article-rag\data\final_joined_paragraphs.csv"
-DATA_DIR = os.environ["DATA_DIR"]
-EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
-OLLAMA_HOST = os.environ["OLLAMA_HOST"]
+DATA_DIR = os.environ.get("DATA_DIR", os.path.join(__file__, "..", "data"))
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
 
 @dataclass
