@@ -9,6 +9,8 @@
 **Note**: Startup of the app as well as LLM querying can take a long time, *especially* without a GPU. \
 If you don't have llama2 downloaded in ollama (or your running with docker), first invocation of LLM querying can be very time-consuming due to ollama downloading the llama2 model (it is known to have connection issues).
 
+*[16GB RAM, Intel Core i7-9750H CPU, Nvidia GeForce 1660-Ti] -- 3 minutes startup with GPU (no cache) -- 10 minutes startup CPU-only (no cache)*
+
 ### Running with Docker
 1. Run `git clone https://github.com/AmevinLS/ds-article-rag`
 2. Change working directory to the cloned repository (`cd ds-article-rag`)
