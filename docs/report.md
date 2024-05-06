@@ -13,13 +13,20 @@
 
 The task lies in retrieving relevant articles excerpts from the **1300+ Towards DataScience Medium Articles Dataset** dataset ([link](https://www.kaggle.com/datasets/meruvulikith/1300-towards-datascience-medium-articles-dataset)).
 
-Because pure article segment retrieval is quite a strange task for this dataset. This is due TDS articles necessarily being text written with a single idea thread from start to finish. This is why the "generation" part of RAG comes into play - LLM summarization of the retrieved documents can distill the core information. This is why this LLM summarization was added as an optional feature.
+Initially, the task of isolating article segments didn't seem to offer significant value to me, because TDS articles are most often written with a single idea thread from start to finish. However, it still proved to be a quite useful exercise. Additionally, to mitigate this issue, I decided to improve the functionality by adding an optional feature of text summarization using an LLM model (even though not explicitly stated in the task description). The hope is that the LLM distills is able to separate the core info of the paragraph from the article throughline.
+
+The decision to use 'paragraph' as the granular unit is driven by my observation that it typically encapsulates a singular, cohesive idea in most of the TDS articles.
 
 
-# 2. System design
+## 2. System design
 
 ### Overview
 ![Sequence Diagram](./diagram.png)
+
+### Parameters available to the user
+- `retrieve_k` - number of articles to retrieve from the vector store
+- `sim_score_threshold` - minimum cosine similarity, below which articles won't be displayed
+- `stdMultiplier` - the preprocessing parameter described in point 3 of [Chunking strategy](#-chunking-strategy). Changing this parameter will require preprocessing the data and building FAISS index again. 
 
 ### Chunking strategy
 1. Each article is divided into paragraphs (split by `"\n\n"`).
