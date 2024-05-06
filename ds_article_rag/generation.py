@@ -28,7 +28,7 @@ def prompt_ollama_with_articles(
         prompt_system += f"{i+1}. {entry['title']}\n\n" f"{entry['content']}\n\n"
 
     client = ollama.Client(host=ollama_host)
-    if not any([entry["name"].startwith(model) for entry in client.list()["models"]]):
+    if not any([entry["name"].startswith(model) for entry in client.list()["models"]]):
         client.pull(model)
     ollama_result = client.chat(
         model=model,
