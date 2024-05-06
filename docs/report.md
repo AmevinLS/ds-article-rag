@@ -19,7 +19,7 @@ Because pure article segment retrieval is quite a strange task for this dataset.
 # 2. System design
 
 ### Overview
-[TODO]
+![Sequence Diagram](./diagram.png)
 
 ### Chunking strategy
 1. Each article is divided into paragraphs (split by `"\n\n"`).
