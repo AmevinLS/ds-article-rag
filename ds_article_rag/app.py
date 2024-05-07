@@ -3,6 +3,7 @@ import streamlit as st
 from langchain.docstore.document import Document
 
 import os
+from pathlib import Path
 from typing import List, Tuple
 from dataclasses import dataclass
 
@@ -11,7 +12,9 @@ from retrieval import faiss_from_df
 from generation import prompt_ollama_with_articles
 
 
-DATA_DIR = os.environ.get("DATA_DIR", os.path.join(__file__, "..", "data"))
+DATA_DIR = os.environ.get(
+    "DATA_DIR", os.path.join(Path(__file__).parent.parent, "data")
+)
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
